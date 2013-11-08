@@ -28,7 +28,11 @@ HEIGHT = 480
 DIM = "#{WIDTH}x#{HEIGHT}"
 THRESHOLD = 10
 
-STDOUT.sync = true
+
+if debug
+  STDOUT.sync = true
+  display = IO.popen "avplay -v error -pixel_format rgb24 -f rawvideo -video_size #{DIM} -i - >/dev/null", 'wb'
+end
 
 loop do
   if !File.exists?( "/dev/video0" )
@@ -38,7 +42,7 @@ loop do
   # avconv gets what should only be a temporary error with my webcam, but it
   # exits instead, so I restart instead.
   start = Time.new
-  video = IO.popen( "avconv -v error -f video4linux2 -r 5 -s #{DIM} -i /dev/video0 -pix_fmt rgb24 -f rawvideo -vcodec rawvideo -s #{DIM} -", 'rb' )
+  video = IO.popen( "avconv -v quiet -f video4linux2 -r 15 -s #{DIM} -i /dev/video0 -pix_fmt rgb24 -f rawvideo -vcodec rawvideo -s #{DIM} -", 'rb' )
 
   present = nil
   switching = nil
@@ -46,12 +50,19 @@ loop do
   loop do
     video.read(WIDTH * HEIGHT * 3, data)
     break if data.size != WIDTH * HEIGHT * 3
+    count = counter.green( data )
+    if display
+      begin
+        display.write data
+      rescue Errno::EPIPE
+        exit
+      end
+    end
     if Time.new - start < SETTLE_TIME
       print "?#{' ' * 40}\r" if debug
       next
     end
-    count = counter.green( data )
-    print "#{'=' * (count / 10)} #{' ' * 40}\r" if debug
+    print "#{count} #{'=' * [(count / 20), 40].min} #{' ' * 40}\r" if debug
     reading = count >= THRESHOLD
     if reading == present
       switching = nil

@@ -14,8 +14,12 @@ int green( VALUE image_str) {
     r = image[i+0];
     g = image[i+1];
     b = image[i+2];
-    if( g > 128 && r < 64 && b < 64 )
+    if( g > 128 && r < 64 && b < 64 ) {
       count ++;
+      image[i+0] = 255;
+      image[i+1] = 0;
+      image[i+2] = 0;
+    }
   }
   return count;
 }
