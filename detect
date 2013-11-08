@@ -1,0 +1,88 @@
+#!/usr/bin/ruby
+
+require_relative 'lib/green_counter'
+
+debug = ARGV.size > 0
+
+# Fallback if C is not available
+def count_green data
+  count = 0
+
+  data.chars.each_slice(3) do |r,g,b|
+    next unless g.ord > 128 && r.ord < 64 && b.ord < 64
+    count += 1
+  end
+
+  count
+end
+
+counter = GreenCounter.new
+
+data = String.new
+
+SETTLE_TIME = 2.0
+SWITCH_TIME = 1.0
+
+WIDTH = 640
+HEIGHT = 480
+DIM = "#{WIDTH}x#{HEIGHT}"
+THRESHOLD = 10
+
+STDOUT.sync = true
+
+loop do
+  if !File.exists?( "/dev/video0" )
+    abort "No camera"
+  end
+
+  # avconv gets what should only be a temporary error with my webcam, but it
+  # exits instead, so I restart instead.
+  start = Time.new
+  video = IO.popen( "avconv -v error -f video4linux2 -r 5 -s #{DIM} -i /dev/video0 -pix_fmt rgb24 -f rawvideo -vcodec rawvideo -s #{DIM} -", 'rb' )
+
+  present = nil
+  switching = nil
+
+  loop do
+    video.read(WIDTH * HEIGHT * 3, data)
+    break if data.size != WIDTH * HEIGHT * 3
+    if Time.new - start < SETTLE_TIME
+      print "?#{' ' * 40}\r" if debug
+      next
+    end
+    count = counter.green( data )
+    print "#{'=' * (count / 10)} #{' ' * 40}\r" if debug
+    reading = count >= THRESHOLD
+    if reading == present
+      switching = nil
+      next
+    end
+
+    if !switching
+      switching = Time.new
+      next
+    end
+
+    if Time.new - switching > SWITCH_TIME
+      if present.nil?
+        unknown = true
+      end
+      present = reading
+      text = reading ? "on" : "off"
+      switching = nil
+      if unknown
+        puts "First state: #{text}"
+        next
+      end
+
+      if present
+        system "mute"
+      else
+        system "unmute"
+      end
+
+      puts "Headphones #{text}"
+    end
+  end
+  sleep 1
+end
