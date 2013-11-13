@@ -26,12 +26,13 @@ SWITCH_TIME = 1.0
 WIDTH = 640
 HEIGHT = 480
 DIM = "#{WIDTH}x#{HEIGHT}"
-THRESHOLD = 10
+THRESHOLD = 50
+RATE = 7
 
 
 if debug
   STDOUT.sync = true
-  display = IO.popen "avplay -v error -pixel_format rgb24 -f rawvideo -video_size #{DIM} -i - >/dev/null", 'wb'
+  display = IO.popen "mplayer -quiet -demuxer rawvideo -rawvideo w=#{WIDTH}:h=#{HEIGHT}:format=rgb24 -", 'wb'
 end
 
 loop do
@@ -42,7 +43,7 @@ loop do
   # avconv gets what should only be a temporary error with my webcam, but it
   # exits instead, so I restart instead.
   start = Time.new
-  video = IO.popen( "avconv -v quiet -f video4linux2 -r 15 -s #{DIM} -i /dev/video0 -pix_fmt rgb24 -f rawvideo -vcodec rawvideo -s #{DIM} -", 'rb' )
+  video = IO.popen( "avconv -v error -f video4linux2 -r #{RATE} -s #{DIM} -i /dev/video0 -pix_fmt rgb24 -f rawvideo -vcodec rawvideo -s #{DIM} -r #{RATE} -", 'rb' )
 
   present = nil
   switching = nil
@@ -62,7 +63,7 @@ loop do
       print "?#{' ' * 40}\r" if debug
       next
     end
-    print "#{count} #{'=' * [(count / 20), 40].min} #{' ' * 40}\r" if debug
+    print "#{count} #{'=' * [(count / 30), 40].min} #{' ' * 40}\r" if debug
     reading = count >= THRESHOLD
     if reading == present
       switching = nil
